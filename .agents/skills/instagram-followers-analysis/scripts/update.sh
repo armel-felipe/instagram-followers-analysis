@@ -21,11 +21,15 @@ if [ ! -f "$ZIP_PATH" ]; then
 fi
 
 # Step 1: Archive previous export folders from project root
-mkdir -p "$ARCHIVE_DIR"
+# Use timestamp subfolder to avoid conflicts with previous archives
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+ARCHIVE_SUBDIR="$ARCHIVE_DIR/$TIMESTAMP"
+mkdir -p "$ARCHIVE_SUBDIR"
+
 for old_dir in "$PROJECT_ROOT"/connections "$PROJECT_ROOT"/files; do
   if [ -d "$old_dir" ]; then
-    echo "Archiving: $(basename "$old_dir") -> ~/archive/"
-    mv "$old_dir" "$ARCHIVE_DIR/$(basename "$old_dir")"
+    echo "Archiving: $(basename "$old_dir") -> ~/archive/$TIMESTAMP/"
+    mv "$old_dir" "$ARCHIVE_SUBDIR/"
   fi
 done
 
