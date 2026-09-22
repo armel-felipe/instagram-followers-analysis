@@ -1,49 +1,70 @@
 ---
 name: instagram-refresh
 description: >
-  Runs the data refresh for this Instagram analysis project. Fetches the
-  latest followers/following lists via Instaloader and regenerates the HTML
-  dashboard. Use when the user asks to "atualizar dados", "update data",
-  "refresh", "rodar atualização", or any request to get fresh Instagram
-  follower/following numbers without a manual export.
+  Runs the full data refresh pipeline for this Instagram analysis project.
+  Archives the previous export folder, unzips the new Instagram data export
+  (provided by the user), and regenerates the HTML dashboard with complete
+  data including dates. Use when the user asks to "atualizar dados",
+  "update data", "refresh", "rodar atualização", or any request to refresh
+  the Instagram follower/following dashboard. The user must provide the path
+  to the downloaded .zip export file.
 ---
 
-# Instagram Data Refresh
+# Instagram Data Refresh Pipeline
 
 This is a project-specific skill for the `analise_instagram` workspace.
-It wraps `fetch_instagram.py` from the `instagram-followers-analysis` skill
-with the project's known configuration.
+It runs the official Instagram data export pipeline: archive previous
+export → unzip new export → regenerate HTML.
 
-## Project configuration
+## Pipeline steps
 
-| Setting | Value |
-|---------|-------|
-| Instagram username | `tubr_cdgirassois` |
-| Output file | `instagram_followers_following.html` (project root) |
-| Session cache | `~/.config/instaloader/session-tubr_cdgirassois` |
-| Python to use | `/usr/bin/python3` (system — pyenv 3.12 lacks `_lzma`) |
+1. **Archive**: moves any existing `instagram-tubr_cdgirassois-*` folder to
+   `~/archive/` (creates the folder if it doesn't exist)
+2. **Unzip**: extracts the new export zip to the project root
+3. **Parse**: runs `parse_instagram.py` to generate the HTML dashboard
 
 ## How to run
 
 ```bash
-/usr/bin/python3 .agents/skills/instagram-followers-analysis/scripts/fetch_instagram.py --username tubr_cdgirassois -o instagram_followers_following.html
+bash .agents/skills/instagram-followers-analysis/scripts/update.sh <path-to-new-export.zip>
 ```
 
-If a session file already exists at the cache path, the script connects
-directly without prompting. On the first run (or after session expiry) it
-prompts for the password interactively, or you can set `IG_PASSWORD` as an
-environment variable.
+Example:
+
+```bash
+bash .agents/skills/instagram-followers-analysis/scripts/update.sh ~/Downloads/instagram-tubr_cdgirassois-2026-09-22-AB3XK9.zip
+```
+
+## What the script does
+
+| Step | Action |
+|------|--------|
+| 1 | Moves `instagram-tubr_cdgirassois-*` folders to `~/archive/` |
+| 2 | Unzips the new export to the project root |
+| 3 | Runs `parse_instagram.py` (export mode — includes dates) |
+| 4 | Writes `instagram_followers_following.html` in the project root |
+
+## Prerequisites
+
+The user must download the export first:
+
+1. Instagram → Settings → Your Activity → Download your information
+2. Select "Connections" (or full export)
+3. Wait for the email with the download link
+4. Download the zip
+
+Instagram does not allow programmatic download of the export (requires email
+confirmation), so step 2 is manual. The agent runs steps 1 and 3-4 after the
+user provides the zip path.
 
 ## What to tell the user after running
 
 1. Confirm the counts printed in the output (total, mutual, churners, onboarding)
-2. Open the regenerated `instagram_followers_following.html` if asked
-3. Note that this uses the direct-fetch mode, so dates are not available
-   (unlike the export mode, which includes them)
+2. The HTML includes dates for each relationship direction
+3. Previous export is safely archived in `~/archive/`
 
-## Troubleshooting
+## Files
 
-- **"Instaloader not installed"** → `pip install instaloader`
-- **`ModuleNotFoundError: No module named '_lzma'`** → use `/usr/bin/python3` instead of pyenv
-- **Login challenge / checkpoint** → open the Instagram app or browser, complete the verification, then retry
-- **Session expired** → delete `~/.config/instaloader/session-tubr_cdgirassois` and run again
+- `SKILL.md` — this file
+- The pipeline script lives in
+  `.agents/skills/instagram-followers-analysis/scripts/update.sh`
