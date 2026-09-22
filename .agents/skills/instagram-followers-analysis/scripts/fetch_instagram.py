@@ -4,11 +4,10 @@ Fetch Instagram followers/following lists directly (no export needed)
 using Instaloader, then generate the same HTML dashboard.
 
 Usage:
-    python3 fetch_instagram.py --username YOUR_IG_USERNAME [-o output.html]
-    IG_PASSWORD=xxx python3 fetch_instagram.py --username YOUR_IG_USERNAME
+    python3 fetch_instagram.py [--username YOUR_IG_USERNAME] [-o output.html]
 
-Session file is cached in ~/.config/instaloader/session-YOUR_IG_USERNAME
-so you only enter the password once.
+Credentials are read from the .env file in the project root (IG_PASSWORD,
+IG_USERNAME). Falls back to getpass if not set.
 
 Requires: pip install instaloader
 """
@@ -29,12 +28,33 @@ from parse_instagram import generate_html, build_data
 SESSION_DIR = os.path.join(os.path.expanduser("~"), ".config", "instaloader")
 
 
+def load_env():
+    """Load .env from the project root (walk up from cwd)."""
+    d = os.getcwd()
+    while True:
+        envfile = os.path.join(d, ".env")
+        if os.path.isfile(envfile):
+            with open(envfile) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, _, val = line.partition("=")
+                        key = key.strip()
+                        val = val.strip()
+                        if key and key not in os.environ:
+                            os.environ[key] = val
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
 def fetch(username, password=None):
     L = instaloader.Instaloader(
         quiet=True,
         download_comments=False,
         download_geotags=False,
-        download_tagged=False,
         download_pictures=False,
         download_videos=False,
         save_metadata=False,
@@ -55,6 +75,8 @@ def fetch(username, password=None):
     if not L.context.is_logged_in:
         if not password:
             password = os.environ.get("IG_PASSWORD") or getpass.getpass(f"Password for {username}: ")
+        if not password:
+            sys.exit("No password provided. Set IG_PASSWORD in .env or as environment variable.")
         try:
             L.login(username, password)
         except Exception as e:
@@ -81,11 +103,18 @@ def fetch(username, password=None):
 
 def main():
     ap = argparse.ArgumentParser(description="Fetch Instagram followers/following and generate HTML dashboard")
-    ap.add_argument("--username", required=True, help="Instagram username")
+    ap.add_argument("--username", default=None, help="Instagram username (default: reads IG_USERNAME from .env)")
     ap.add_argument("-o", "--output", default="instagram_followers_following.html", help="Output HTML filename")
     args = ap.parse_args()
 
-    followers, following = fetch(args.username)
+    load_env()
+
+    username = args.username or os.environ.get("IG_USERNAME")
+    if not username:
+        sys.exit("No username provided. Use --username or set IG_USERNAME in .env")
+    password = os.environ.get("IG_PASSWORD")
+
+    followers, following = fetch(username, password)
     rows = build_data(followers, following)
     from collections import Counter
     cats = Counter()
